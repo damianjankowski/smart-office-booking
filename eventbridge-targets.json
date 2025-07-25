@@ -1,0 +1,7 @@
+[
+    {
+        "Id": "ParkingLambdaTarget",
+        "Arn": "arn:aws:lambda:${AWS_REGION}:${AWS_ACCOUNT_ID}:function:${AWS_LAMBDA_FUNCTION_NAME}",
+        "Input": "{}"
+    }
+] 

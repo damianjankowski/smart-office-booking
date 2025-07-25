@@ -1,0 +1,6 @@
+{
+    "Name": "parking-lambda-schedule",
+    "ScheduleExpression": "cron(1 13 * * ? *)",
+    "State": "ENABLED",
+    "Description": "Schedule for parking Lambda function to run daily at 15:01 Europe/Warsaw (13:01 UTC during summer, 14:01 UTC during winter)"
+} 
