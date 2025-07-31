@@ -79,13 +79,53 @@ create-env: ## Create env
 		--policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole || true
 	@echo "Waiting for IAM role propagation..."
 	sleep 15
-	$(AWS) lambda create-function \
+	@if [ -f .env ]; then \
+		echo "Creating Lambda function with environment variables from .env file..."; \
+		@echo '{' > env-vars-temp.json; \
+		@echo '  "Variables": {' >> env-vars-temp.json; \
+		@grep -v '^#' .env | grep -v '^$$' | grep -v '^AWS_REGION=' | grep -v '^AWS_ACCOUNT_ID=' | grep -v '^AWS_LAMBDA_FUNCTION_NAME=' | grep -v '^BOOKING_DATE=' | sed 's/^/    "/;s/=/": "/;s/$$/",/' >> env-vars-temp.json; \
+		@sed -i '' '$$ s/,$$//' env-vars-temp.json; \
+		@echo '  }' >> env-vars-temp.json; \
+		@echo '}' >> env-vars-temp.json; \
+		$(AWS) lambda create-function \
+			--function-name $(AWS_LAMBDA_FUNCTION_NAME) \
+			--runtime python3.12 \
+			--role arn:aws:iam::$(AWS_ACCOUNT_ID):role/lambda-role \
+			--handler parking.lambda_handler \
+			--zip-file fileb://$(DEPLOYMENT_PACKAGE_ZIP) \
+			--region $(AWS_REGION) \
+			--environment file://env-vars-temp.json; \
+		@rm env-vars-temp.json; \
+	else \
+		echo "Creating Lambda function without environment variables (no .env file found)..."; \
+		$(AWS) lambda create-function \
+			--function-name $(AWS_LAMBDA_FUNCTION_NAME) \
+			--runtime python3.12 \
+			--role arn:aws:iam::$(AWS_ACCOUNT_ID):role/lambda-role \
+			--handler parking.lambda_handler \
+			--zip-file fileb://$(DEPLOYMENT_PACKAGE_ZIP) \
+			--region $(AWS_REGION); \
+	fi
+
+.PHONY: update-env
+update-env: ## Update Lambda function environment variables from .env file
+	@if [ ! -f .env ]; then \
+		echo "Error: .env file not found. Please create a .env file with your environment variables."; \
+		exit 1; \
+	fi
+	@echo "Updating Lambda function environment variables from .env file..."
+	@echo '{' > env-vars-temp.json
+	@echo '  "Variables": {' >> env-vars-temp.json
+	@grep -v '^#' .env | grep -v '^$$' | grep -v '^AWS_REGION=' | grep -v '^AWS_ACCOUNT_ID=' | grep -v '^AWS_LAMBDA_FUNCTION_NAME=' | grep -v '^BOOKING_DATE=' | sed 's/^/    "/;s/=/": "/;s/$$/",/' >> env-vars-temp.json
+	@sed -i '' '$$ s/,$$//' env-vars-temp.json
+	@echo '  }' >> env-vars-temp.json
+	@echo '}' >> env-vars-temp.json
+	$(AWS) lambda update-function-configuration \
 		--function-name $(AWS_LAMBDA_FUNCTION_NAME) \
-		--runtime python3.12 \
-		--role arn:aws:iam::$(AWS_ACCOUNT_ID):role/lambda-role \
-		--handler lambda_function.lambda_handler \
-		--zip-file fileb://$(DEPLOYMENT_PACKAGE_ZIP) \
-		--region $(AWS_REGION)
+		--region $(AWS_REGION) \
+		--environment file://env-vars-temp.json
+	@rm env-vars-temp.json
+	@echo "Environment variables updated successfully."
 
 .PHONY: deploy
 deploy: build-on-docker ## Deploy the Lambda function directly
@@ -94,6 +134,10 @@ deploy: build-on-docker ## Deploy the Lambda function directly
 		--function-name $(AWS_LAMBDA_FUNCTION_NAME) \
 		--zip-file fileb://$(DEPLOYMENT_PACKAGE_ZIP) \
 		--region $(AWS_REGION)
+	@if [ -f .env ]; then \
+		echo "Updating environment variables from .env file..."; \
+		$(MAKE) update-env; \
+	fi
 
 .PHONY: create-schedule
 create-schedule: ## Create EventBridge schedule for Lambda
