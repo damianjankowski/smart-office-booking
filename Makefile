@@ -176,3 +176,12 @@ clean-images:  ## Remove Docker images locally
 		docker rmi $(AWS_FUNCTION_DOCKER_IMAGE_NAME):$$tag || true; \
 		docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$$(AWS_REGION).amazonaws.com/$(AWS_ECR_REPO):$$tag || true; \
 	done
+
+# Cleanup
+# -----------------------------------------------------------------------------
+##@ Cleanup
+.PHONY: cleanup-aws
+cleanup-aws:  ## Remove all AWS resources created by this project
+	@echo "Removing AWS resources..."
+	@chmod +x cleanup-aws-resources.sh
+	@./cleanup-aws-resources.sh
